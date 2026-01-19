@@ -6,7 +6,7 @@ from datetime import datetime
 from app.database.base import Base
 
 class Incident(Base):
-    __tablename__ = "Incident"
+    __tablename__ = "incident"
 
     id : Mapped[uuid.UUID]= mapped_column(
         UUID(as_uuid=True),
