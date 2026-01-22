@@ -6,12 +6,20 @@ from app.api import alerts, incidents  # ensure routers are imported
 configure_root_logger()  # set up logging once
 logger = get_logger(__name__)
 
-app = FastAPI(title="AI Maintainer Agent (MVP)")
 
-# include routers
-app.include_router(alerts.router, prefix="", tags=["alerts"])
-app.include_router(incidents.router, prefix="", tags=["incidents"])
+def createAPP() -> FastAPI:
+    app = FastAPI(title="AI MAINTAINER AGENT (MVP)")
 
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
+    app.include_router(alerts.router , prefix="/alerts" , tags=["alerts"])
+    app.include_router(incidents.router , prefix="/incidents" , tags=["incident"])
+
+    @app.get("/health")
+    async def health():
+        return {"status" : "ok"}
+    
+    return app
+
+
+app = createAPP()
+logger.info("========FastAPI application started!!========")
+
