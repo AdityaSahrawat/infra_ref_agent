@@ -5,3 +5,5 @@ httpx
 pydantic
 python-dotenv
 sqlalchemy
+alembic
+psycopg2-binary

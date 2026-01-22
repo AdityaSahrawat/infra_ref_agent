@@ -53,7 +53,7 @@ class Action(Base):
 
     incident_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("incidents.id", ondelete="CASCADE"),
+        ForeignKey("incident.id", ondelete="CASCADE"),
         nullable=False,
     )
 

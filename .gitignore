@@ -50,5 +50,5 @@ dist/
 # Other
 .idea/
 
-# Ignore requirements.txt lock files
-requirements*.lock
+# Ignore req.txt lock files
+req*.lock
