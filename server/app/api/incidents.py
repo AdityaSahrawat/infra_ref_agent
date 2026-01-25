@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 
 @router.get("/incident" , response_model=List[IncidentRead])
-async def get_incidents(db:Session = Depends(get_db())):
+async def get_incidents(db:Session = Depends(get_db)):
 
     logger.info("Fetching all incidents")
     Incidents = db.execute(select(Incident)).scalars().all()
