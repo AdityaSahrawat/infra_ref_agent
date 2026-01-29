@@ -1,5 +1,6 @@
 from typing import Optional , List
 from uuid import UUID
+from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app.database.session import get_db
@@ -54,3 +55,27 @@ async def get_action_by_id(action_id : str , db : Session = Depends(get_db)):
 
     return action
 
+@router.patch("/action/{action_id}" , response_mode=Action)
+def execute_action(
+    action_id: UUID,
+    db: Session = Depends(get_db),
+):
+    # 1️⃣ Fetch action
+    action = db.get(Action, action_id)
+    if not action:
+        raise HTTPException(status_code=404, detail="Action not found")
+
+    # 2️⃣ Mark action executed
+    action.status = "executed"
+    action.executed_at = datetime.utc()
+    db.commit()
+    db.refresh(action)
+
+    # 3️⃣ RESOLVE INCIDENT (THIS IS THE ONLY PLACE)
+    incident = db.get(Incident, action.incident_id)
+    if incident and incident.status != "resolved":
+        incident.status = "resolved"
+        incident.ended_at = datetime.utc()
+        db.commit()
+
+    return action

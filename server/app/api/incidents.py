@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.services.logger import get_logger
 from app.database.session import get_db
 from sqlalchemy import select
-from app.database.models import Incident
+from app.database.models import Incident , Action
 from app.database.schema import IncidentRead , IncidentCreate , IncidentUpdate
 from uuid import UUID
 router = APIRouter()
@@ -40,6 +40,30 @@ async def create_incident(payload : IncidentCreate , db : Session = Depends(get_
     db.add(incident)
     db.commit()
     db.refresh(incident)
+
+    llm_result = analyze_incident_with_llm({
+        "alert_name": incident.alert_name,
+        "severity": incident.severity,
+        "instance": incident.instance,
+        "raw_alert": incident.raw_alert,
+    })
+
+    if (
+        incident.severity == "critical"
+        and incident.llm_confidence is not None
+        and incident.llm_confidence >= 0.7
+        and incident.recommended_action
+        ):
+        action = Action(
+            incident_id=incident.id,
+            action_type=incident.recommended_action,
+            action_payload={"source": "llm"},
+            status="pending",
+        )
+        db.add(action)
+        db.commit()
+
+
     return incident
 
 
