@@ -1,14 +1,6 @@
-import os
 import json
-import google.generativeai as genai
-
-# 1️⃣ Configure Gemini once
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
-model = genai.GenerativeModel("gemini-1.5-flash")
-
-
-
+import re
+from app.config import model
 
 def analyze_incident_with_llm(incident: dict) -> dict:
     """
@@ -42,6 +34,14 @@ def analyze_incident_with_llm(incident: dict) -> dict:
     try:
         response = model.generate_content(prompt)
         text = response.text.strip()
+
+        # Clean markdown code blocks if present
+        if text.startswith("```"):
+            # Remove opening ```json or just ```
+            text = re.sub(r"^```[a-zA-Z]*\n", "", text)
+            # Remove closing ```
+            text = re.sub(r"\n```$", "", text)
+            text = text.strip()
 
         result = json.loads(text)
 

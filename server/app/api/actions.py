@@ -44,7 +44,7 @@ async def get_action(incident_id : Optional[str] = None, db : Session = Depends(
     return actions
 
 
-@router.get("/action/{action_id}" , response_model=Action)
+@router.get("/action/{action_id}" , response_model=ActionRead)
 async def get_action_by_id(action_id : str , db : Session = Depends(get_db)):
 
 
@@ -55,7 +55,7 @@ async def get_action_by_id(action_id : str , db : Session = Depends(get_db)):
 
     return action
 
-@router.patch("/action/{action_id}" , response_mode=Action)
+@router.patch("/action/{action_id}" , response_model=ActionRead)
 def execute_action(
     action_id: UUID,
     db: Session = Depends(get_db),

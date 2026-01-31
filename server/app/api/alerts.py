@@ -1,7 +1,19 @@
 # app/api/alerts.py
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from app.models.alert_model import AlertModel
 from app.services.logger import get_logger
+
+from pydantic import BaseModel
+from typing import Dict, Any, Optional
+
+class AlertModel(BaseModel):
+    status: str
+    labels: Dict[str, Any]
+    annotations: Dict[str, Any]
+    startsAt: Optional[str] = None
+    endsAt: Optional[str] = None
+    generatorURL: Optional[str] = None
+    
+    model_config = {"extra": "allow"}
 
 router = APIRouter()
 logger = get_logger(__name__)
