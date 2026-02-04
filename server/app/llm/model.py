@@ -32,7 +32,10 @@ def analyze_incident_with_llm(incident: dict) -> dict:
         """
 
     try:
-        response = model.generate_content(prompt)
+        response = model(
+            model="gemini-1.5-flash",
+            contents=prompt
+        )
         text = response.text.strip()
 
         # Clean markdown code blocks if present

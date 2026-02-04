@@ -14,16 +14,16 @@ router = APIRouter()
 logger = get_logger(__name__)
 
 
-@router.get("/incident" , response_model=List[IncidentRead])
+@router.get("/" , response_model=List[IncidentRead])
 async def get_incidents(db:Session = Depends(get_db)):
 
     logger.info("Fetching all incidents")
     Incidents = db.execute(select(Incident)).scalars().all()
 
-    return Incidents
+    return Incidents 
 
 
-@router.get("/incident/{incident_id}" , response_model=IncidentRead)
+@router.get("/{incident_id}" , response_model=IncidentRead)
 async def get_incident_by_id(incident_id: str , db : Session = Depends(get_db)):
     logger.info(f"Fetching incident with ID: {incident_id}")
 
@@ -35,9 +35,19 @@ async def get_incident_by_id(incident_id: str , db : Session = Depends(get_db)):
     return incident
      
 
-@router.post("/incident" , response_model=IncidentCreate , status_code=status.HTTP_201_CREATED)
+@router.post("/" , response_model=IncidentCreate , status_code=status.HTTP_201_CREATED)
 async def create_incident(payload : IncidentCreate , db : Session = Depends(get_db)):
-    incident = Incident(**payload.model_dump())
+    data = payload.model_dump()
+    incident = Incident(
+        alert_name=data["alert_name"],
+        severity=data["severity"],
+        instance=data["instance"],
+        status=data["status"],
+        startedAt=data["started_at"],
+        receivedAt=data["received_at"],
+        rawAlert=data["raw_alert"],
+        matric_summary="",
+    )
 
     db.add(incident)
     db.commit()
@@ -77,7 +87,7 @@ async def create_incident(payload : IncidentCreate , db : Session = Depends(get_
     return incident
 
 
-@router.patch("/incident/{incident_id}" ,response_model=IncidentUpdate)
+@router.patch("/{incident_id}" ,response_model=IncidentUpdate)
 async def update_incident(incident_id: str ,payload: IncidentUpdate, db : Session = Depends(get_db)):
 
     incident = db.get(Incident , incident_id)

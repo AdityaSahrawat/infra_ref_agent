@@ -10,10 +10,14 @@ class IncidentCreate(BaseModel):
     instance: str
     status: str
 
-    started_at: datetime
-    received_at: datetime
+    started_at: datetime = Field(alias="startedAt")
+    received_at: datetime = Field(alias="receivedAt")
 
-    raw_alert: Dict[str, Any]
+    raw_alert: Dict[str, Any] = Field(alias="rawAlert")
+    
+    model_config = {
+        "populate_by_name": True
+    }
 
 
 class IncidentUpdate(BaseModel):
