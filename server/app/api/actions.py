@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-@router.post("/action" , response_model=ActionCreate)
+@router.post("/" , response_model=ActionRead)
 async def create_action(payload : ActionCreate , incident_id : UUID, db: Session = Depends(get_db)):
 
     incident = db.get(Incident , incident_id)
@@ -31,20 +31,20 @@ async def create_action(payload : ActionCreate , incident_id : UUID, db: Session
     return action
 
 
-@router.get("/action" , response_model=List[ActionRead])
-async def get_action(incident_id : Optional[str] = None, db : Session = Depends(get_db)):
+@router.get("/" , response_model=List[ActionRead])
+async def get_action(incident_id : Optional[UUID] = None, db : Session = Depends(get_db)):
 
     stmt = select(Action)
 
     if incident_id:
-        stmt = stmt.where(incident_id == incident_id)
+        stmt = stmt.where(Action.incident_id == incident_id)
 
     actions = db.execute(stmt).scalars().all()
 
     return actions
 
 
-@router.get("/action/{action_id}" , response_model=ActionRead)
+@router.get("/{action_id}" , response_model=ActionRead)
 async def get_action_by_id(action_id : str , db : Session = Depends(get_db)):
 
 
@@ -67,7 +67,7 @@ def execute_action(
 
     # 2️⃣ Mark action executed
     action.status = "executed"
-    action.executed_at = datetime.utc()
+    action.executed_at = datetime.utcnow()
     db.commit()
     db.refresh(action)
 
@@ -75,7 +75,7 @@ def execute_action(
     incident = db.get(Incident, action.incident_id)
     if incident and incident.status != "resolved":
         incident.status = "resolved"
-        incident.ended_at = datetime.utc()
+        incident.endedAt = datetime.utcnow()
         db.commit()
 
     return action

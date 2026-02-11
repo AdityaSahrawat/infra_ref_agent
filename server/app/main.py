@@ -1,7 +1,7 @@
 # app/main.py
 from fastapi import FastAPI
 from app.services.logger import configure_root_logger, get_logger
-from app.api import alerts, incidents  # ensure routers are imported
+from app.api import alerts, incidents, actions  # ensure routers are imported
 
 configure_root_logger()  # set up logging once
 logger = get_logger(__name__)
@@ -12,6 +12,7 @@ def createAPP() -> FastAPI:
 
     app.include_router(alerts.router , prefix="/alerts" , tags=["alerts"])
     app.include_router(incidents.router , prefix="/incident" , tags=["incident"])
+    app.include_router(actions.router , prefix="/action" , tags=["action"])
 
     @app.get("/health")
     async def health():

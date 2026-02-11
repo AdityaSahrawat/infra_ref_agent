@@ -1,6 +1,9 @@
 import json
 import re
-from app.config import model
+from app.config import model, GEMINI_MODEL
+from app.services.logger import get_logger
+
+logger = get_logger(__name__)
 
 def analyze_incident_with_llm(incident: dict) -> dict:
     """
@@ -33,7 +36,7 @@ def analyze_incident_with_llm(incident: dict) -> dict:
 
     try:
         response = model(
-            model="gemini-1.5-flash",
+            model=GEMINI_MODEL,
             contents=prompt
         )
         text = response.text.strip()
@@ -55,7 +58,8 @@ def analyze_incident_with_llm(incident: dict) -> dict:
             "confidence": float(result.get("confidence", 0.0)),
         }
 
-    except Exception as e:
+    except Exception:
+        logger.exception("LLM analysis failed")
         # HARD GUARANTEE: never break the system
         return {
             "root_cause": "LLM analysis failed",

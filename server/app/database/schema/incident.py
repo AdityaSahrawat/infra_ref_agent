@@ -39,9 +39,9 @@ class IncidentRead(BaseModel):
     instance: str
     status: str
 
-    started_at: datetime
-    ended_at: Optional[datetime]
-    received_at: datetime
+    started_at: datetime = Field(alias="startedAt")
+    ended_at: Optional[datetime] = Field(default=None, alias="endedAt")
+    received_at: datetime = Field(alias="receivedAt")
     created_at: datetime
 
     root_cause: Optional[str]
@@ -51,5 +51,6 @@ class IncidentRead(BaseModel):
     actions: List["ActionRead"] = Field(default_factory=list)
 
     model_config = {
-        "from_attributes": True
+        "from_attributes": True,
+        "populate_by_name": True,
     }
