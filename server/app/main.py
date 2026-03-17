@@ -12,7 +12,7 @@ def createAPP() -> FastAPI:
 
     app.include_router(alerts.router , prefix="/alerts" , tags=["alerts"])
     app.include_router(incidents.router , prefix="/incident" , tags=["incident"])
-    app.include_router(actions.router , prefix="/action" , tags=["action"])
+    app.include_router(actions.router , prefix="/incident" , tags=["action"])
 
     @app.get("/health")
     async def health():

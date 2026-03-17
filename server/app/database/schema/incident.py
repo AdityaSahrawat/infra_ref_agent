@@ -10,14 +10,13 @@ class IncidentCreate(BaseModel):
     instance: str
     status: str
 
-    started_at: datetime = Field(alias="startedAt")
-    received_at: datetime = Field(alias="receivedAt")
+    started_at: datetime
+    received_at: datetime
 
-    raw_alert: Dict[str, Any] = Field(alias="rawAlert")
-    
-    model_config = {
-        "populate_by_name": True
-    }
+    raw_alert: Dict[str, Any]
+
+    # Optional: allow clients to pass a precomputed summary; otherwise server fills default.
+    metrics_summary: Optional[str] = None
 
 
 class IncidentUpdate(BaseModel):
@@ -28,7 +27,7 @@ class IncidentUpdate(BaseModel):
     llm_confidence: Optional[float] = None
     recommended_action: Optional[str] = None
 
-    metrics_summary: Optional[Dict[str, Any]] = None
+    metrics_summary: Optional[str] = None
 
 
 class IncidentRead(BaseModel):
@@ -39,10 +38,11 @@ class IncidentRead(BaseModel):
     instance: str
     status: str
 
-    started_at: datetime = Field(alias="startedAt")
-    ended_at: Optional[datetime] = Field(default=None, alias="endedAt")
-    received_at: datetime = Field(alias="receivedAt")
+    started_at: datetime
+    ended_at: Optional[datetime]
+    received_at: datetime
     created_at: datetime
+    metrics_summary: str = Field(default="")
 
     root_cause: Optional[str]
     llm_confidence: Optional[float]
@@ -52,5 +52,4 @@ class IncidentRead(BaseModel):
 
     model_config = {
         "from_attributes": True,
-        "populate_by_name": True,
     }

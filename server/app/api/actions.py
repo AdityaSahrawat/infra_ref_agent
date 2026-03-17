@@ -13,8 +13,8 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-@router.post("/" , response_model=ActionRead)
-async def create_action(payload : ActionCreate , incident_id : UUID, db: Session = Depends(get_db)):
+@router.post("/{incident_id}/actions" , response_model=ActionRead)
+async def create_action(incident_id: UUID, payload: ActionCreate, db: Session = Depends(get_db)):
 
     incident = db.get(Incident , incident_id)
 
@@ -22,7 +22,10 @@ async def create_action(payload : ActionCreate , incident_id : UUID, db: Session
         raise HTTPException(status_code=404 , detail=f"Incident not found for id : {incident_id}")
     
 
-    action = Action(incident_id = incident_id , **payload.model_dump())
+    action = Action(
+        incident_id=incident_id,
+        **payload.model_dump(),
+    )
 
     db.add(action)
     db.commit()
@@ -31,7 +34,7 @@ async def create_action(payload : ActionCreate , incident_id : UUID, db: Session
     return action
 
 
-@router.get("/" , response_model=List[ActionRead])
+@router.get("/actions" , response_model=List[ActionRead])
 async def get_action(incident_id : Optional[UUID] = None, db : Session = Depends(get_db)):
 
     stmt = select(Action)
@@ -44,18 +47,18 @@ async def get_action(incident_id : Optional[UUID] = None, db : Session = Depends
     return actions
 
 
-@router.get("/{action_id}" , response_model=ActionRead)
-async def get_action_by_id(action_id : str , db : Session = Depends(get_db)):
+@router.get("/actions/{action_id}" , response_model=ActionRead)
+async def get_action_by_id(action_id: UUID, db : Session = Depends(get_db)):
 
 
-    action = db.get(Action , action_id)
+    action = db.get(Action, action_id)
 
     if not action:
         raise HTTPException(status_code=404 , detail=f"No Action found for id : {action_id}")
 
     return action
 
-@router.patch("/action/{action_id}" , response_model=ActionRead)
+@router.patch("/actions/{action_id}" , response_model=ActionRead)
 def execute_action(
     action_id: UUID,
     db: Session = Depends(get_db),
@@ -75,7 +78,7 @@ def execute_action(
     incident = db.get(Incident, action.incident_id)
     if incident and incident.status != "resolved":
         incident.status = "resolved"
-        incident.endedAt = datetime.utcnow()
+        incident.ended_at = datetime.utcnow()
         db.commit()
 
     return action

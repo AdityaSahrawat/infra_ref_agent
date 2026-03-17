@@ -43,10 +43,10 @@ async def create_incident(payload : IncidentCreate , db : Session = Depends(get_
         severity=data["severity"],
         instance=data["instance"],
         status=data["status"],
-        startedAt=data["started_at"],
-        receivedAt=data["received_at"],
-        rawAlert=data["raw_alert"],
-        matric_summary="",
+        started_at=data["started_at"],
+        received_at=data["received_at"],
+        raw_alert=data["raw_alert"],
+        metrics_summary=data.get("metrics_summary") or "",
     )
 
     db.add(incident)
@@ -57,7 +57,7 @@ async def create_incident(payload : IncidentCreate , db : Session = Depends(get_
         "alert_name": incident.alert_name,
         "severity": incident.severity,
         "instance": incident.instance,
-        "raw_alert": incident.rawAlert,
+        "raw_alert": incident.raw_alert,
     })
     
     # Update incident with LLM analysis
@@ -87,7 +87,7 @@ async def create_incident(payload : IncidentCreate , db : Session = Depends(get_
     return incident
 
 
-@router.patch("/{incident_id}" ,response_model=IncidentUpdate)
+@router.patch("/{incident_id}" ,response_model=IncidentRead)
 async def update_incident(incident_id: UUID ,payload: IncidentUpdate, db : Session = Depends(get_db)):
 
     incident = db.get(Incident , incident_id)
@@ -97,17 +97,11 @@ async def update_incident(incident_id: UUID ,payload: IncidentUpdate, db : Sessi
 
     updates = payload.model_dump(exclude_unset=True)
 
-    field_map = {
-        "ended_at": "endedAt",
-        "metrics_summary": "matric_summary",
-    }
-
     for field, value in updates.items():
-        target_field = field_map.get(field, field)
-        setattr(incident, target_field, value)
+        setattr(incident, field, value)
 
     db.commit()
     db.refresh(incident)
 
-    return payload
+    return incident
 
