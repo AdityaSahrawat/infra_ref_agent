@@ -1,8 +1,12 @@
+PYTHON := .venv/bin/python
+
+.PHONY: dev migrate test
+
 dev:
-	uvicorn app.main:app --reload
+	$(PYTHON) -m uvicorn app.main:app --reload
 
 migrate:
-	python -m alembic upgrade head
+	$(PYTHON) -m alembic upgrade head
 
 test:
-	pytest -q
+	$(PYTHON) -m pytest -q
