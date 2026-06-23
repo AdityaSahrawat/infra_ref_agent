@@ -1,33 +1,43 @@
-from typing import Dict , List ,Any, Optional
 from datetime import datetime
-from pydantic import BaseModel, Field
+from typing import Annotated, Any
 from uuid import UUID
+
+from pydantic import BaseModel, Field
+
 from app.database.schema.action import ActionRead
+
+
+Embedding = Annotated[list[float], Field(min_length=768, max_length=768)]
+
 
 class IncidentCreate(BaseModel):
     alert_name: str
     severity: str
     instance: str
+    service: str = Field(min_length=1)
     status: str
 
     started_at: datetime
     received_at: datetime
 
-    raw_alert: Dict[str, Any]
+    raw_alert: dict[str, Any]
+    embedding: Embedding | None = None
 
     # Optional: allow clients to pass a precomputed summary; otherwise server fills default.
-    metrics_summary: Optional[str] = None
+    metrics_summary: str | None = None
 
 
 class IncidentUpdate(BaseModel):
-    status: Optional[str] = None
-    ended_at: Optional[datetime] = None
+    service: str | None = Field(default=None, min_length=1)
+    status: str | None = None
+    ended_at: datetime | None = None
 
-    root_cause: Optional[str] = None
-    llm_confidence: Optional[float] = None
-    recommended_action: Optional[str] = None
+    root_cause: str | None = None
+    llm_confidence: float | None = None
+    recommended_action: str | None = None
 
-    metrics_summary: Optional[str] = None
+    metrics_summary: str | None = None
+    embedding: Embedding | None = None
 
 
 class IncidentRead(BaseModel):
@@ -36,19 +46,21 @@ class IncidentRead(BaseModel):
     alert_name: str
     severity: str
     instance: str
+    service: str
     status: str
 
     started_at: datetime
-    ended_at: Optional[datetime]
+    ended_at: datetime | None
     received_at: datetime
     created_at: datetime
     metrics_summary: str = Field(default="")
 
-    root_cause: Optional[str]
-    llm_confidence: Optional[float]
-    recommended_action: Optional[str]
+    root_cause: str | None
+    llm_confidence: float | None
+    recommended_action: str | None
+    embedding: Embedding | None = None
 
-    actions: List["ActionRead"] = Field(default_factory=list)
+    actions: list["ActionRead"] = Field(default_factory=list)
 
     model_config = {
         "from_attributes": True,

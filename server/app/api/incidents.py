@@ -42,11 +42,13 @@ async def create_incident(payload : IncidentCreate , db : Session = Depends(get_
         alert_name=data["alert_name"],
         severity=data["severity"],
         instance=data["instance"],
+        service=data["service"],
         status=data["status"],
         started_at=data["started_at"],
         received_at=data["received_at"],
         raw_alert=data["raw_alert"],
         metrics_summary=data.get("metrics_summary") or "",
+        embedding=data.get("embedding"),
     )
 
     db.add(incident)
@@ -57,6 +59,7 @@ async def create_incident(payload : IncidentCreate , db : Session = Depends(get_
         "alert_name": incident.alert_name,
         "severity": incident.severity,
         "instance": incident.instance,
+        "service": incident.service,
         "raw_alert": incident.raw_alert,
     })
     

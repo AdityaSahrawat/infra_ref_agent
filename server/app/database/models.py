@@ -4,6 +4,7 @@ from sqlalchemy.orm import Mapped , mapped_column , relationship
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 from app.database.base import Base
+from pgvector.sqlalchemy import Vector
 
 class Incident(Base):
     __tablename__ = "incident"
@@ -14,9 +15,9 @@ class Incident(Base):
         default=uuid.uuid4
     )
 
-    alert_name : Mapped[str] = mapped_column(Text , nullable=False)
+    alert_name : Mapped[str] = mapped_column(Text , nullable=False , index = True)
     severity : Mapped[str] = mapped_column(Text , nullable=False) 
-    instance : Mapped[str] = mapped_column(Text , nullable= False)
+    instance : Mapped[str] = mapped_column(Text , nullable= False, index = True)
     status : Mapped[str] = mapped_column(Text , nullable=False)
     
     started_at: Mapped[datetime] = mapped_column("startedAt", TIMESTAMP, nullable=False)
@@ -27,21 +28,29 @@ class Incident(Base):
         nullable=False,
         default=datetime.utcnow,
         server_default=text("CURRENT_TIMESTAMP"),
+        index = True
+    )
+
+    service: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        index=True
     )
 
     raw_alert: Mapped[dict] = mapped_column("rawAlert", JSON, nullable=False)
-    # DB column is named 'matric_summary' (typo) - keep it, but expose a clearer Python attribute.
     metrics_summary: Mapped[str] = mapped_column(
-        "matric_summary",
+        "matrics_summary",
         Text,
         nullable=False,
         default="",
         server_default="",
     )
 
-    root_cause : Mapped[str] = mapped_column(Text , nullable=True)
+    root_cause : Mapped[str | None] = mapped_column(Text , nullable=True)
     llm_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     recommended_action: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    embedding : Mapped[list[float] | None] = mapped_column(Vector(768) , nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP,
@@ -52,7 +61,7 @@ class Incident(Base):
 
     actions : Mapped[list["Action"]] = relationship(
         back_populates="incident",
-        cascade= "all , delete-orphan"
+        cascade="all, delete-orphan"
     )
 
 

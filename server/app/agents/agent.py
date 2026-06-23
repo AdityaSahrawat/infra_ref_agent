@@ -70,6 +70,12 @@ def handle_alert(alert: Any) -> None:
             or labels.get("host"),
             default="unknown",
         )
+        service = _stringify(
+            labels.get("service")
+            or labels.get("app")
+            or labels.get("job"),
+            default="unknown",
+        )
         status = _stringify(data.get("status"), default="firing")
 
         started_at = _coerce_datetime(data.get("startsAt") or data.get("startedAt") or data.get("starts_at"))
@@ -88,6 +94,7 @@ def handle_alert(alert: Any) -> None:
                 "alert_name": alert_name,
                 "severity": severity,
                 "instance": instance,
+                "service": service,
                 "raw_alert": dict(data),
             }
         )
@@ -98,6 +105,7 @@ def handle_alert(alert: Any) -> None:
                 alert_name=alert_name,
                 severity=severity,
                 instance=instance,
+                service=service,
                 status=status,
                 started_at=started_at,
                 ended_at=ended_at,
