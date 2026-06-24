@@ -9,6 +9,11 @@ from app.database.models import Incident , Action
 from app.database.schema import IncidentRead , IncidentCreate , IncidentUpdate
 from uuid import UUID
 from app.llm.model import analyze_incident_with_llm
+from app.rag.embeddings import (
+    build_query_text,
+    get_embedding,
+)
+from app.rag.retriever import retrieve_context
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -20,7 +25,7 @@ async def get_incidents(db:Session = Depends(get_db)):
     logger.info("Fetching all incidents")
     Incidents = db.execute(select(Incident)).scalars().all()
 
-    return Incidents 
+    return Incidents
 
 
 @router.get("/{incident_id}" , response_model=IncidentRead)
@@ -31,9 +36,9 @@ async def get_incident_by_id(incident_id: UUID , db : Session = Depends(get_db))
 
     if not incident:
         raise HTTPException(status_code=404 , detail="Incident not found")
-    
+
     return incident
-     
+
 
 @router.post("/" , response_model=IncidentRead , status_code=status.HTTP_201_CREATED)
 async def create_incident(payload : IncidentCreate , db : Session = Depends(get_db)):
@@ -55,19 +60,52 @@ async def create_incident(payload : IncidentCreate , db : Session = Depends(get_
     db.commit()
     db.refresh(incident)
 
-    llm_result = analyze_incident_with_llm({
-        "alert_name": incident.alert_name,
-        "severity": incident.severity,
-        "instance": incident.instance,
-        "service": incident.service,
-        "raw_alert": incident.raw_alert,
-    })
-    
+    query_embedding = None
+    context = {
+        "similar_incidents": [],
+        "service_history": [],
+        "alert_history": [],
+    }
+    try:
+        query_text = build_query_text(
+            payload.alert_name,
+            payload.service,
+            payload.severity,
+            payload.metrics_summary,
+        )
+
+        query_embedding = get_embedding(query_text)
+        context = retrieve_context(
+            db=db,
+            query_embedding=query_embedding,
+            service=payload.service,
+            alert_name=payload.alert_name,
+            exclude_incident_id=incident.id,
+        )
+    except Exception:
+        logger.exception(
+            "Embedding/RAG retrieval failed; continuing without historical context"
+        )
+
+
+    llm_result = analyze_incident_with_llm(
+        {
+            "alert_name": incident.alert_name,
+            "severity": incident.severity,
+            "instance": incident.instance,
+            "service": incident.service,
+            "metrics_summary": incident.metrics_summary,
+            "raw_alert": incident.raw_alert,
+        },
+        context=context,
+    )
+
     # Update incident with LLM analysis
     incident.root_cause = llm_result.get("root_cause")
     incident.recommended_action = llm_result.get("recommended_action")
     incident.llm_confidence = llm_result.get("confidence")
-    
+    incident.embedding = query_embedding
+
     db.commit()
     db.refresh(incident)
 
@@ -94,7 +132,7 @@ async def create_incident(payload : IncidentCreate , db : Session = Depends(get_
 async def update_incident(incident_id: UUID ,payload: IncidentUpdate, db : Session = Depends(get_db)):
 
     incident = db.get(Incident , incident_id)
-           
+
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
 

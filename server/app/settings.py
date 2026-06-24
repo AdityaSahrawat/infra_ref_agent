@@ -16,17 +16,23 @@ class Settings(BaseModel):
         default="gemini-2.0-flash",
         description="Model name for google-genai (Google AI API)",
     )
+    gemini_embedding_model: str = Field(
+        default="gemini-embedding-2",
+        description="Embedding model name for google-genai",
+    )
 
     @classmethod
     def from_env(cls) -> "Settings":
         database_url = os.getenv("DATABASE_URL")
         gemini_api_key = os.getenv("GEMINI_API_KEY")
         gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        gemini_embedding_model = os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-2")
 
         return cls(
             database_url=database_url or "",
             gemini_api_key=gemini_api_key or "",
             gemini_model=gemini_model,
+            gemini_embedding_model=gemini_embedding_model,
         )
 
 

@@ -3,9 +3,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
+from fastapi.encoders import jsonable_encoder
+
 from app.database.engine import SessionLocal
 from app.database.models import Action, Incident
 from app.llm.model import analyze_incident_with_llm
+from app.rag.embeddings import build_query_text, get_embedding
+from app.rag.retriever import retrieve_context
 from app.services.logger import get_logger
 
 logger = get_logger(__name__)
@@ -58,6 +62,14 @@ def handle_alert(alert: Any) -> None:
             logger.warning("Unsupported alert payload type: %s", type(alert))
             return
 
+        # Pydantic's default model_dump() keeps datetime objects in Python mode.
+        # Encode the complete nested payload before storing it in a JSON column.
+        encoded_data = jsonable_encoder(dict(data))
+        if not isinstance(encoded_data, dict):
+            logger.warning("Alert payload did not encode to a JSON object")
+            return
+        data = encoded_data
+
         labels = data.get("labels") or {}
         annotations = data.get("annotations") or {}
 
@@ -89,16 +101,6 @@ def handle_alert(alert: Any) -> None:
             default="",
         )
 
-        llm_result = analyze_incident_with_llm(
-            {
-                "alert_name": alert_name,
-                "severity": severity,
-                "instance": instance,
-                "service": service,
-                "raw_alert": dict(data),
-            }
-        )
-
         db = SessionLocal()
         try:
             incident = Incident(
@@ -110,14 +112,56 @@ def handle_alert(alert: Any) -> None:
                 started_at=started_at,
                 ended_at=ended_at,
                 received_at=datetime.utcnow(),
-                raw_alert=dict(data),
+                raw_alert=data,
                 metrics_summary=metrics_summary,
-                root_cause=llm_result.get("root_cause"),
-                recommended_action=llm_result.get("recommended_action"),
-                llm_confidence=llm_result.get("confidence"),
             )
 
             db.add(incident)
+            db.commit()
+            db.refresh(incident)
+
+            query_embedding = None
+            context = {
+                "similar_incidents": [],
+                "service_history": [],
+                "alert_history": [],
+            }
+            try:
+                query_text = build_query_text(
+                    alert_name=alert_name,
+                    service=service,
+                    severity=severity,
+                    metrics_summary=metrics_summary,
+                )
+                query_embedding = get_embedding(query_text)
+                context = retrieve_context(
+                    db=db,
+                    query_embedding=query_embedding,
+                    service=service,
+                    alert_name=alert_name,
+                    exclude_incident_id=incident.id,
+                )
+            except Exception:
+                logger.exception(
+                    "Embedding/RAG retrieval failed; continuing without historical context"
+                )
+
+            llm_result = analyze_incident_with_llm(
+                {
+                    "alert_name": alert_name,
+                    "severity": severity,
+                    "instance": instance,
+                    "service": service,
+                    "metrics_summary": metrics_summary,
+                    "raw_alert": data,
+                },
+                context=context,
+            )
+
+            incident.root_cause = llm_result.get("root_cause")
+            incident.recommended_action = llm_result.get("recommended_action")
+            incident.llm_confidence = llm_result.get("confidence")
+            incident.embedding = query_embedding
             db.commit()
             db.refresh(incident)
 

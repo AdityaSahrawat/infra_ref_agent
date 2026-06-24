@@ -5,45 +5,86 @@
 
 	let creating = $state(false);
 	let createError = $state<string | null>(null);
+	let processingMessage = $state<string | null>(null);
 
 	function toIso(d: Date) {
 		return d.toISOString();
 	}
 
-	function sampleIncident(severity: 'critical' | 'warning' = 'critical') {
+	function sampleAlert(severity: 'critical' | 'warning' = 'critical') {
 		const now = new Date();
 		return {
-			alert_name: 'HighCPUUsage',
-			severity,
-			instance: 'prod-server-01',
 			status: 'firing',
-			started_at: toIso(new Date(now.getTime() - 5 * 60 * 1000)),
-			received_at: toIso(now),
-			raw_alert: {
-				labels: { alertname: 'HighCPUUsage', instance: 'prod-server-01', job: 'node-exporter' },
-				annotations: {
-					summary: 'CPU usage > 90% for 5m',
-					description: 'Instance prod-server-01 CPU at 95%'
-				}
-			}
+			labels: {
+				alertname: 'HighCPUUsage',
+				severity,
+				instance: 'prod-server-01',
+				service: 'api',
+				job: 'node-exporter'
+			},
+			annotations: {
+				summary: 'CPU usage > 90% for 5m',
+				description: 'Instance prod-server-01 CPU at 95%'
+			},
+			startsAt: toIso(new Date(now.getTime() - 5 * 60 * 1000)),
+			endsAt: null,
+			generatorURL: 'http://localhost:9090/graph'
 		};
 	}
 
-	async function createSample(severity: 'critical' | 'warning') {
+	function sleep(milliseconds: number) {
+		return new Promise((resolve) => setTimeout(resolve, milliseconds));
+	}
+
+	async function waitForProcessedAlert(startedAt: string) {
+		const expectedStart = new Date(startedAt).getTime();
+
+		for (let attempt = 0; attempt < 20; attempt += 1) {
+			await sleep(1000);
+			const response = await fetch('/api/incidents');
+			if (!response.ok) continue;
+
+			const incidents = (await response.json()) as Incident[];
+			const processed = incidents.some((incident) => {
+				const actualStart = new Date(incident.started_at).getTime();
+				return (
+					incident.alert_name === 'HighCPUUsage' &&
+					incident.service === 'api' &&
+					Math.abs(actualStart - expectedStart) < 1000 &&
+					incident.llm_confidence !== undefined &&
+					incident.llm_confidence !== null
+				);
+			});
+
+			if (processed) {
+				location.reload();
+				return;
+			}
+		}
+
+		processingMessage = 'The alert is still processing. Refresh this page shortly.';
+	}
+
+	async function sendSampleAlert(severity: 'critical' | 'warning') {
 		creating = true;
 		createError = null;
+		processingMessage = null;
+		const alert = sampleAlert(severity);
 		try {
-			const res = await fetch('/api/incidents', {
+			const res = await fetch('/api/alerts', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify(sampleIncident(severity))
+				body: JSON.stringify(alert)
 			});
 			if (!res.ok) {
 				createError = await res.text();
 				return;
 			}
-			// reload the page data
-			location.reload();
+
+			processingMessage = 'Alert accepted. Waiting for embedding and LLM analysis…';
+			await waitForProcessedAlert(alert.startsAt);
+		} catch (error) {
+			createError = error instanceof Error ? error.message : 'Unable to send alert';
 		} finally {
 			creating = false;
 		}
@@ -66,10 +107,13 @@
 {/if}
 
 <div class="toolbar">
-	<button disabled={creating} onclick={() => createSample('critical')}>Create sample critical incident</button>
-	<button class="secondary" disabled={creating} onclick={() => createSample('warning')}>Create sample warning incident</button>
+	<button disabled={creating} onclick={() => sendSampleAlert('critical')}>Send sample critical alert</button>
+	<button class="secondary" disabled={creating} onclick={() => sendSampleAlert('warning')}>Send sample warning alert</button>
 	{#if createError}
 		<div class="error">{createError}</div>
+	{/if}
+	{#if processingMessage}
+		<div class="muted">{processingMessage}</div>
 	{/if}
 </div>
 
@@ -81,6 +125,7 @@
 			<tr>
 				<th>Alert</th>
 				<th>Severity</th>
+				<th>Service</th>
 				<th>Instance</th>
 				<th>Status</th>
 				<th>Started</th>
@@ -92,6 +137,7 @@
 				<tr>
 					<td><a href={`/incidents/${i.id}`}>{i.alert_name}</a></td>
 					<td><span class={`pill ${i.severity}`}>{i.severity}</span></td>
+					<td>{i.service}</td>
 					<td>{i.instance}</td>
 					<td>{i.status}</td>
 					<td>{fmt(i.started_at)}</td>

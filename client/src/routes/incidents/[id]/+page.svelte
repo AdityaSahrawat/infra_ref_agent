@@ -43,11 +43,17 @@
 		<div class="row"><span class="k">ID</span><span class="v">{data.incident.id}</span></div>
 		<div class="row"><span class="k">Alert</span><span class="v">{data.incident.alert_name}</span></div>
 		<div class="row"><span class="k">Severity</span><span class={`v pill ${data.incident.severity}`}>{data.incident.severity}</span></div>
+		<div class="row"><span class="k">Service</span><span class="v">{data.incident.service}</span></div>
 		<div class="row"><span class="k">Instance</span><span class="v">{data.incident.instance}</span></div>
 		<div class="row"><span class="k">Status</span><span class="v">{data.incident.status}</span></div>
 		<div class="row"><span class="k">Started</span><span class="v">{fmt(data.incident.started_at)}</span></div>
 		<div class="row"><span class="k">Received</span><span class="v">{fmt(data.incident.received_at)}</span></div>
 		<div class="row"><span class="k">Ended</span><span class="v">{fmt(data.incident.ended_at)}</span></div>
+		<div class="row"><span class="k">Metrics</span><span class="v">{data.incident.metrics_summary || '—'}</span></div>
+		<div class="row">
+			<span class="k">RAG embedding</span>
+			<span class="v">{data.incident.embedding ? `${data.incident.embedding.length} dimensions` : 'Not generated'}</span>
+		</div>
 	</div>
 
 	<h3>LLM Analysis</h3>

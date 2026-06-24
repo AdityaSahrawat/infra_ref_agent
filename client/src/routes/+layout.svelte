@@ -15,9 +15,7 @@
 			<div class="subtitle">Incidents · Actions</div>
 		</div>
 		<nav class="nav">
-			<a href="/">Home</a>
-			<a href="/incidents">Incidents</a>
-			<a href="/actions">Actions</a>
+			<a href="/">Dashboard</a>
 		</nav>
 	</header>
 

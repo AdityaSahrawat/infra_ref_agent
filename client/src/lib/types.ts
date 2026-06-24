@@ -5,6 +5,7 @@ export type Incident = {
 	alert_name: string;
 	severity: string;
 	instance: string;
+	service: string;
 	status: string;
 	started_at: string;
 	received_at: string;
@@ -14,7 +15,9 @@ export type Incident = {
 	llm_confidence?: number | null;
 	recommended_action?: string | null;
 	metrics_summary?: string;
+	embedding?: number[] | null;
 	raw_alert?: Record<string, JsonValue>;
+	actions?: Action[];
 };
 
 export type Action = {

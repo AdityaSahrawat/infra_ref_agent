@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field
 
 from app.services.logger import get_logger
 
+from app.agents.agent import handle_alert 
+
 
 class AlertModel(BaseModel):
     """Represents a single alert (matches Alertmanager's per-alert shape)."""
@@ -47,7 +49,6 @@ async def receive_alert(payload: AlertPayload, background_tasks: BackgroundTasks
     """
     try:
         logger.info("Received alert payload")
-        from app.agents.agent import handle_alert  # local import ok
 
         alerts: List[AlertModel]
         if isinstance(payload, AlertmanagerWebhook):
