@@ -7,6 +7,7 @@ from fastapi.encoders import jsonable_encoder
 
 from app.database.engine import SessionLocal
 from app.database.models import Action, Incident
+from app.executor.executor import execute_tool
 from app.llm.model import analyze_incident_with_llm
 from app.rag.embeddings import build_query_text, get_embedding
 from app.rag.retriever import retrieve_context
@@ -158,8 +159,26 @@ def handle_alert(alert: Any) -> None:
                 context=context,
             )
 
+            tool_name = llm_result.get("tool")
+            tool_args = llm_result.get("args") or {}
+
+            # Fallback tool inference if not explicitly output by LLM
+            if not tool_name and incident.recommended_action:
+                action_text = incident.recommended_action.lower()
+                if "scale" in action_text:
+                    tool_name = "scale_deployment"
+                    tool_args = {"deployment": service if service != "unknown" else "auth-api", "replicas": 3}
+                elif "restart" in action_text:
+                    tool_name = "restart_deployment"
+                    tool_args = {"deployment": service if service != "unknown" else "auth-api"}
+
+            # Ensure deployment name fallback if missing in tool_args
+            if tool_name in ("restart_deployment", "scale_deployment", "get_pod_status", "verify_deployment_health"):
+                if "deployment" not in tool_args and "deployment_name" not in tool_args and service != "unknown":
+                    tool_args["deployment"] = service
+
             incident.root_cause = llm_result.get("root_cause")
-            incident.recommended_action = llm_result.get("recommended_action")
+            incident.recommended_action = llm_result.get("recommended_action") or tool_name
             incident.llm_confidence = llm_result.get("confidence")
             incident.embedding = query_embedding
             db.commit()
@@ -169,16 +188,51 @@ def handle_alert(alert: Any) -> None:
                 incident.severity == "critical"
                 and incident.llm_confidence is not None
                 and incident.llm_confidence >= 0.7
-                and incident.recommended_action
+                and (tool_name or incident.recommended_action)
             ):
-                action = Action(
-                    incident_id=incident.id,
-                    action_type=incident.recommended_action,
-                    action_payload={"source": "llm"},
-                    status="pending",
-                )
-                db.add(action)
-                db.commit()
+                action_type_str = tool_name or incident.recommended_action
+                payload_data = {
+                    "tool": tool_name or incident.recommended_action,
+                    "args": tool_args,
+                    "source": "llm",
+                    "confidence": incident.llm_confidence,
+                }
+
+                # Auto-execute if confidence >= 0.85
+                if tool_name and incident.llm_confidence >= 0.85:
+                    logger.info("High confidence (%.2f). Auto-executing tool '%s'", incident.llm_confidence, tool_name)
+                    exec_res = execute_tool(tool_name, tool_args)
+                    
+                    status_str = "executed" if exec_res.get("success") else "failed"
+                    payload_data["result"] = exec_res.get("result")
+                    payload_data["logs"] = exec_res.get("logs", "")
+                    payload_data["executed_at"] = exec_res.get("executed_at")
+
+                    action = Action(
+                        incident_id=incident.id,
+                        action_type=action_type_str,
+                        action_payload=payload_data,
+                        status=status_str,
+                        executed_at=datetime.utcnow(),
+                        error_message=exec_res.get("error"),
+                    )
+                    db.add(action)
+                    
+                    if exec_res.get("success"):
+                        incident.status = "resolved"
+                        incident.ended_at = datetime.utcnow()
+                    
+                    db.commit()
+                else:
+                    # Require human approval for medium-confidence actions
+                    action = Action(
+                        incident_id=incident.id,
+                        action_type=action_type_str,
+                        action_payload=payload_data,
+                        status="pending",
+                    )
+                    db.add(action)
+                    db.commit()
 
             logger.info("Incident created from alert: %s (%s)", incident.id, alert_name)
         finally:

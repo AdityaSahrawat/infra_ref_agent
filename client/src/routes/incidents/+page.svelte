@@ -32,25 +32,31 @@
 		};
 	}
 
+	function parseDate(s?: string | null): Date {
+		if (!s) return new Date(NaN);
+		const normalized = s.endsWith('Z') || s.includes('+') ? s : s + 'Z';
+		return new Date(normalized);
+	}
+
 	function sleep(milliseconds: number) {
 		return new Promise((resolve) => setTimeout(resolve, milliseconds));
 	}
 
 	async function waitForProcessedAlert(startedAt: string) {
-		const expectedStart = new Date(startedAt).getTime();
+		const expectedStart = parseDate(startedAt).getTime();
 
-		for (let attempt = 0; attempt < 20; attempt += 1) {
+		for (let attempt = 0; attempt < 30; attempt += 1) {
 			await sleep(1000);
 			const response = await fetch('/api/incidents');
 			if (!response.ok) continue;
 
 			const incidents = (await response.json()) as Incident[];
 			const processed = incidents.some((incident) => {
-				const actualStart = new Date(incident.started_at).getTime();
+				const actualStart = parseDate(incident.started_at).getTime();
 				return (
 					incident.alert_name === 'HighCPUUsage' &&
 					incident.service === 'api' &&
-					Math.abs(actualStart - expectedStart) < 1000 &&
+					Math.abs(actualStart - expectedStart) < 2000 &&
 					incident.llm_confidence !== undefined &&
 					incident.llm_confidence !== null
 				);
@@ -93,7 +99,8 @@
 	function fmt(s?: string | null) {
 		if (!s) return '';
 		try {
-			return new Date(s).toLocaleString();
+			const d = parseDate(s);
+			return isNaN(d.getTime()) ? s : d.toLocaleString();
 		} catch {
 			return s;
 		}

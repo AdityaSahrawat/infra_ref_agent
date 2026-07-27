@@ -53,25 +53,31 @@
 		};
 	}
 
+	function parseDate(s?: string | null): Date {
+		if (!s) return new Date(NaN);
+		const normalized = s.endsWith('Z') || s.includes('+') ? s : s + 'Z';
+		return new Date(normalized);
+	}
+
 	function sleep(milliseconds: number) {
 		return new Promise((resolve) => setTimeout(resolve, milliseconds));
 	}
 
 	async function waitForProcessedAlert(startedAt: string) {
-		const expectedStart = new Date(startedAt).getTime();
+		const expectedStart = parseDate(startedAt).getTime();
 
-		for (let attempt = 0; attempt < 20; attempt += 1) {
+		for (let attempt = 0; attempt < 30; attempt += 1) {
 			await sleep(1000);
 			const response = await fetch('/api/incidents');
 			if (!response.ok) continue;
 
 			const incidents = (await response.json()) as Incident[];
 			const processed = incidents.some((incident) => {
-				const actualStart = new Date(incident.started_at).getTime();
+				const actualStart = parseDate(incident.started_at).getTime();
 				return (
 					incident.alert_name === 'HighCPUUsage' &&
 					incident.service === 'api' &&
-					Math.abs(actualStart - expectedStart) < 1000 &&
+					Math.abs(actualStart - expectedStart) < 2000 &&
 					incident.llm_confidence !== undefined &&
 					incident.llm_confidence !== null
 				);
@@ -126,10 +132,33 @@
 		}
 	}
 
+	let runningDemo = $state(false);
+
+	async function runDemoScenarios() {
+		runningDemo = true;
+		createError = null;
+		processingMessage = 'Executing Kubernetes Demo Scenarios (Scaling, Self-Healing & Crash Remediation)...';
+		try {
+			const res = await fetch('/api/demo/scenarios', { method: 'POST' });
+			if (!res.ok) {
+				createError = await res.text();
+				return;
+			}
+			await sleep(1000);
+			location.reload();
+		} catch (error) {
+			createError = error instanceof Error ? error.message : 'Unable to run demo scenarios';
+		} finally {
+			runningDemo = false;
+			processingMessage = null;
+		}
+	}
+
 	function fmt(s?: string | null) {
 		if (!s) return '—';
 		try {
-			return new Date(s).toLocaleString();
+			const d = parseDate(s);
+			return isNaN(d.getTime()) ? s : d.toLocaleString();
 		} catch {
 			return s;
 		}
@@ -153,11 +182,14 @@
 		<div class="simulator-card">
 			<h3>Alert Simulator</h3>
 			<div class="simulator-buttons">
-				<button class="btn btn-critical" disabled={creating} onclick={() => sendSampleAlert('critical')}>
+				<button class="btn btn-critical" disabled={creating || runningDemo} onclick={() => sendSampleAlert('critical')}>
 					{creating ? 'Sending...' : 'Trigger Critical Alert'}
 				</button>
-				<button class="btn btn-warning" disabled={creating} onclick={() => sendSampleAlert('warning')}>
+				<button class="btn btn-warning" disabled={creating || runningDemo} onclick={() => sendSampleAlert('warning')}>
 					{creating ? 'Sending...' : 'Trigger Warning Alert'}
+				</button>
+				<button class="btn btn-demo" disabled={creating || runningDemo} onclick={runDemoScenarios}>
+					{runningDemo ? 'Running...' : '⚡ Run K8s Demos'}
 				</button>
 			</div>
 			{#if createError}
@@ -556,6 +588,15 @@
 	.btn-warning:hover {
 		background: #d97706;
 		box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+	}
+
+	.btn-demo {
+		background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+		color: white;
+	}
+	.btn-demo:hover {
+		background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+		box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
 	}
 
 	.btn:disabled {

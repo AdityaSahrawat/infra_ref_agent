@@ -1,8 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Annotated, Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 from app.database.schema.action import ActionRead
 
@@ -62,6 +62,15 @@ class IncidentRead(BaseModel):
 
     actions: list["ActionRead"] = Field(default_factory=list)
 
+    @field_serializer("started_at", "ended_at", "received_at", "created_at")
+    def serialize_datetime(self, v: datetime | None) -> str | None:
+        if v is None:
+            return None
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        return v.isoformat().replace("+00:00", "Z")
+
     model_config = {
         "from_attributes": True,
     }
+

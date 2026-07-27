@@ -68,6 +68,13 @@ def analyze_incident_with_llm(
             - recommended_action must be a single, concise, reversible, low-risk next step.
             - Do not recommend destructive operations, credential changes, or data deletion.
 
+            AVAILABLE KUBERNETES TOOLS
+            - "restart_deployment": args {{"deployment": "<name>", "namespace": "default"}}
+            - "scale_deployment": args {{"deployment": "<name>", "replicas": <count>, "namespace": "default"}}
+            - "delete_pod": args {{"pod_name": "<name>", "namespace": "default"}}
+            - "get_pod_logs": args {{"pod_name": "<name>", "namespace": "default"}}
+            - "get_pod_status": args {{"deployment": "<name>" or "pod_name": "<name>", "namespace": "default"}}
+
             CONFIDENCE CALIBRATION
             - 0.00-0.39: weak or conflicting evidence; mostly a hypothesis.
             - 0.40-0.69: plausible explanation with partial supporting evidence.
@@ -89,9 +96,11 @@ def analyze_incident_with_llm(
 
             Return ONLY one valid JSON object with exactly this structure:
             {{
+              "tool": "tool_name" or null,
+              "args": {{"arg_name": "arg_value"}} or {{}},
+              "confidence": number between 0 and 1,
               "root_cause": "concise evidence-based diagnosis" or null,
-              "recommended_action": "one safe and specific next step" or null,
-              "confidence": number between 0 and 1
+              "recommended_action": "one safe and specific next step" or null
             }}
 
             Do not include markdown, commentary, reasoning, or additional keys.
@@ -123,6 +132,8 @@ def analyze_incident_with_llm(
         return {
             "root_cause": result.get("root_cause"),
             "recommended_action": result.get("recommended_action"),
+            "tool": result.get("tool"),
+            "args": result.get("args") or {},
             "confidence": confidence,
         }
 
@@ -132,5 +143,7 @@ def analyze_incident_with_llm(
         return {
             "root_cause": "LLM analysis failed",
             "recommended_action": None,
+            "tool": None,
+            "args": {},
             "confidence": 0.0,
         }

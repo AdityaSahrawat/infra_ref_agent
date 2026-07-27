@@ -8,10 +8,17 @@
 	let executing = $state<string | null>(null);
 	let execError = $state<string | null>(null);
 
+	function parseDate(s?: string | null): Date {
+		if (!s) return new Date(NaN);
+		const normalized = s.endsWith('Z') || s.includes('+') ? s : s + 'Z';
+		return new Date(normalized);
+	}
+
 	function fmt(s?: string | null) {
 		if (!s) return '—';
 		try {
-			return new Date(s).toLocaleString();
+			const d = parseDate(s);
+			return isNaN(d.getTime()) ? s : d.toLocaleString();
 		} catch {
 			return s;
 		}

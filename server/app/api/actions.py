@@ -7,6 +7,7 @@ from app.database.session import get_db
 from fastapi import APIRouter , HTTPException , Depends
 from app.database.schema import ActionCreate , ActionRead , ActionUpdate
 from app.database.models import Action , Incident
+from app.executor.executor import execute_action_payload, execute_tool
 from app.services.logger import get_logger
 
 logger = get_logger(__name__)
@@ -63,22 +64,55 @@ def execute_action(
     action_id: UUID,
     db: Session = Depends(get_db),
 ):
-    # 1️⃣ Fetch action
+    # 1 Fetch action
     action = db.get(Action, action_id)
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
 
-    # 2️⃣ Mark action executed
-    action.status = "executed"
+    # 2 Execute tool against Kubernetes
+    payload = dict(action.action_payload or {})
+    tool_name = payload.get("tool") or action.action_type
+    tool_args = payload.get("args") or {}
+
+    # Tool fallback inference if action_type contains verb
+    if not tool_name or tool_name not in ("restart_deployment", "scale_deployment", "delete_pod", "get_pod_logs", "list_pods", "get_pod_status", "verify_deployment_health"):
+        if "scale" in action.action_type.lower():
+            tool_name = "scale_deployment"
+            if "replicas" not in tool_args:
+                tool_args["replicas"] = 3
+        elif "restart" in action.action_type.lower():
+            tool_name = "restart_deployment"
+
+    if "deployment" not in tool_args and "deployment_name" not in tool_args:
+        incident = db.get(Incident, action.incident_id)
+        if incident and incident.service and incident.service != "unknown":
+            tool_args["deployment"] = incident.service
+
+    exec_res = execute_tool(tool_name=tool_name, args=tool_args)
+
+    # 3 Update Action record
+    action.status = "executed" if exec_res.get("success") else "failed"
     action.executed_at = datetime.utcnow()
+    action.error_message = exec_res.get("error")
+
+    # Preserve execution results in payload
+    updated_payload = dict(action.action_payload or {})
+    updated_payload["tool"] = tool_name
+    updated_payload["args"] = tool_args
+    updated_payload["result"] = exec_res.get("result")
+    updated_payload["logs"] = exec_res.get("logs", "")
+    updated_payload["executed_at"] = exec_res.get("executed_at")
+    action.action_payload = updated_payload
+
     db.commit()
     db.refresh(action)
 
-    # 3️⃣ RESOLVE INCIDENT (THIS IS THE ONLY PLACE)
-    incident = db.get(Incident, action.incident_id)
-    if incident and incident.status != "resolved":
-        incident.status = "resolved"
-        incident.ended_at = datetime.utcnow()
-        db.commit()
+    # 4 RESOLVE INCIDENT IF EXECUTED SUCCESSFULLY
+    if exec_res.get("success"):
+        incident = db.get(Incident, action.incident_id)
+        if incident and incident.status != "resolved":
+            incident.status = "resolved"
+            incident.ended_at = datetime.utcnow()
+            db.commit()
 
     return action

@@ -16,8 +16,20 @@ def createAPP() -> FastAPI:
 
     @app.get("/health")
     async def health():
-        return {"status" : "ok"}
-    
+        return {"status": "ok"}
+
+    @app.post("/executor/execute")
+    async def execute_tool_direct(payload: dict):
+        """Directly control Kubernetes without AI involved."""
+        from app.executor.executor import execute_action_payload
+        return execute_action_payload(payload)
+
+    @app.post("/demo/scenarios")
+    async def trigger_demo_scenarios():
+        """Run all 3 demo scenarios (High CPU scale, Pod deletion self-healing, Crash remediation)."""
+        from app.services.demo_scenarios import run_all_demo_scenarios
+        return run_all_demo_scenarios()
+
     return app
 
 
