@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-api
+  namespace: default
+  labels:
+    app: auth-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth-api
+  template:
+    metadata:
+      labels:
+        app: auth-api
+    spec:
+      containers:
+      - name: auth-api
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        resources:
+          limits:
+            cpu: "100m"
+            memory: "64Mi"
+          requests:
+            cpu: "50m"
+            memory: "32Mi"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: default
+  labels:
+    app: payment-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+    spec:
+      containers:
+      - name: payment-service
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        resources:
+          limits:
+            cpu: "100m"
+            memory: "64Mi"
+          requests:
+            cpu: "50m"
+            memory: "32Mi"

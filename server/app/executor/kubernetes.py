@@ -55,23 +55,35 @@ _MOCK_PODS: Dict[str, Dict[str, Any]] = {
 }
 
 
+_LIVE_K8S_STATUS: Optional[bool] = None
+_LIVE_K8S_LAST_CHECK: float = 0.0
+
+
 def _is_live_k8s_available() -> bool:
-    """Check if Kubernetes client config can be loaded."""
+    """Check if Kubernetes cluster is reachable with a short TTL cache."""
+    global _LIVE_K8S_STATUS, _LIVE_K8S_LAST_CHECK
+    import time
+
     if os.getenv("KUBERNETES_FORCE_MOCK", "").lower() in ("1", "true", "yes"):
         return False
+
+    now = time.time()
+    if _LIVE_K8S_STATUS is not None and (now - _LIVE_K8S_LAST_CHECK) < 10.0:
+        return _LIVE_K8S_STATUS
+
     try:
         try:
             config.load_incluster_config()
-            return True
         except Exception:
-            pass
-        try:
             config.load_kube_config()
-            return True
-        except Exception:
-            return False
+
+        client.VersionApi().get_code(_request_timeout=2)
+        _LIVE_K8S_STATUS = True
     except Exception:
-        return False
+        _LIVE_K8S_STATUS = False
+
+    _LIVE_K8S_LAST_CHECK = now
+    return _LIVE_K8S_STATUS
 
 
 def _get_api_clients():
